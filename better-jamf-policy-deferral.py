@@ -156,7 +156,8 @@ def display_prompt():
     Returns:
         (int) defer_seconds: Number of second user wishes to defer installation
     """
-    defer = subprocess.check_output([JAMFHELPER,
+    try:
+        defer = subprocess.check_output([JAMFHELPER,
                                      '-windowType', 'utility',
                                      '-title', GUI_WINDOW_TITLE,
                                      '-heading', GUI_HEADING,
@@ -166,6 +167,8 @@ def display_prompt():
                                      '-showDelayOptions',
                                      ' '.join(GUI_DEFER_OPTIONS),
                                      '-lockHUD'])
+    except Exception, e:
+            defer = str(e.output)
     # Slice return value of jamfhelper output to remove the button index
     defer = defer[:-1]
     if defer:
