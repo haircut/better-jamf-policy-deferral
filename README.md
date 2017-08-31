@@ -24,7 +24,7 @@ never presented the choice to delay execution.
 
 Long story short, the built-in deferral is inflexible.
 
-Enter Better Jamf Polify Deferral.
+Enter Better Jamf Policy Deferral.
 
 ![Better Jamf Policy Deferral](https://haircut.keybase.pub/github/better-jamf-policy-deferral/better-policy-deferment.gif)
 
