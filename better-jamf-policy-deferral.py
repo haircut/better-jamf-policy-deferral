@@ -216,8 +216,7 @@ def display_confirm(start_date):
 
 
 def display_error():
-    """Displays an error if the LaunchDaemon cannot be written"""
-
+    """Displays a generic error if a problem occurs"""
     errmsg = subprocess.check_output([JAMFHELPER,
                                       '-windowType', 'utility',
                                       '-title', GUI_WINDOW_TITLE,
@@ -331,17 +330,21 @@ def main():
                  }
 
         # Handle start interval of LaunchDaemon based on user's deferrment
-        if secs == 0:
-            # User chose to "start now" so add the RunAtLoad key
-            daemon['RunAtLoad'] = True
+        if secs is not None:
+            if secs == 0:
+                # User chose to "start now" so add the RunAtLoad key
+                daemon['RunAtLoad'] = True
+            else:
+                # User chose to defer, so calculate the deltas and set the
+                # StartCalendarInterval key
+                day, hour, minute, datestring = calculate_deferment(secs)
+                daemon['StartCalendarInterval'] = {'Day': day,
+                                                'Hour': hour,
+                                                'Minute': minute
+                                                }
         else:
-            # User chose to defer, so calculate the deltas and set the
-            # StartCalendarInterval key
-            day, hour, minute, datestring = calculate_deferment(secs)
-            daemon['StartCalendarInterval'] = {'Day': day,
-                                               'Hour': hour,
-                                               'Minute': minute
-                                              }
+            display_error()
+            sys.exit(1)
 
         # Try to write the LaunchDaemon
         if write_launchdaemon(daemon, ld_path):
