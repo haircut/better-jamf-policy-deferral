@@ -26,7 +26,6 @@ import argparse
 import datetime
 import plistlib
 import subprocess
-from Cocoa import NSRunningApplication
 from AppKit import NSWorkspace
 
 # Configuration
@@ -41,7 +40,7 @@ DEFAULT_LD_JAMF_TRIGGER = "trigger_for_deferred_policy"
 
 # If any app listed here is running on the client, no GUI prompts will be shown
 # and this program will exit silently with a non-zero exit code.
-# Examples include are to prevent interrupting presentations.
+# Examples included are to prevent interrupting presentations.
 BLOCKING_APPS = ['Keynote', 'Microsoft PowerPoint']
 
 # Paths to binaries
@@ -228,16 +227,14 @@ def display_error():
                                       '-lockHUD'])
 
 
-def check_pid(process_name):
-    """Checks for a pid of a running process"""
-    pid = subprocess.Popen(['pgrep', process_name],
-                           stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE)
-    pid.communicate()
-    if pid.returncode > 0:
-        return False
-    else:
-        return True
+def get_running_apps():
+    """Return a list of running applications"""
+    procs = []
+    workspace = NSWorkspace.sharedWorkspace()
+    running_apps = workspace.runningApplications()
+    for app in running_apps:
+        procs.append(app.localizedName())
+    return procs
 
 
 def detect_blocking_apps():
@@ -250,11 +247,11 @@ def detect_blocking_apps():
         (bool) true/false if any blocking app is running
     """
     blocking_app_running = False
+    running_apps = get_running_apps()
     for app in BLOCKING_APPS:
-        if check_pid(app):
+        if app in running_apps:
             print "Blocking app {} is running.".format(app)
             blocking_app_running = True
-
     return blocking_app_running
 
 
@@ -313,7 +310,7 @@ def main():
 
         # Check for blocking apps
         if detect_blocking_apps():
-            print "A blocking app was running"
+            print "One or more blocking apps are running."
             sys.exit(1)
 
         secs = display_prompt()
