@@ -51,8 +51,8 @@ JAMFHELPER = ("/Library/Application Support/JAMF/bin/jamfHelper.app/Contents"
 # Prompt GUI Config
 GUI_WINDOW_TITLE = "IT Notification"
 GUI_HEADING = "Software Updates are ready to be installed."
-GUI_ICON = ("/System/Library/CoreServices/Software Update.app/Contents/"
-            "Resources/SoftwareUpdate.icns")
+GUI_ICON = ("/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources"
+            "/AlertCautionIcon.icns")
 GUI_MESSAGE = """Software updates are available for your Mac.
 
 NOTE: Some required updates will require rebooting your computer once installed.
@@ -67,8 +67,8 @@ GUI_BUTTON = "Okay"
 
 # Confirmation dialog Config
 GUI_S_HEADING = "Update scheduled"
-GUI_S_ICON = ("/System/Library/CoreServices/Software Update.app/Contents/"
-              "Resources/SoftwareUpdate.icns")
+GUI_S_ICON = ("/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources"
+              "/AlertCautionIcon.icns")
 GUI_S_BUTTON = "OK"
 # This string should contain '{date}' somewhere so that it may be replaced by
 # the specific datetime for which installation is scheduled
@@ -120,8 +120,6 @@ def build_argparser():
                         default=DEFAULT_LD_LABEL, nargs="?")
     parser.add_argument("jamf_trigger",
                         default=DEFAULT_LD_JAMF_TRIGGER, nargs="?")
-    parser.add_argument("unused", nargs="*")
-
     return parser.parse_known_args()[0]
 
 
@@ -141,7 +139,6 @@ def calculate_deferment(add_seconds):
     now = datetime.datetime.now()
     diff = datetime.timedelta(seconds=add_seconds)
     future = now + diff
-
     return (int(future.strftime("%d")),
             int(future.strftime("%-H")),
             int(future.strftime("%-M")),
@@ -156,6 +153,8 @@ def display_prompt():
 
     Returns:
         (int) defer_seconds: Number of seconds user wishes to defer policy
+        OR
+        None if an error occurs
     """
     cmd = [JAMFHELPER,
            '-windowType', 'utility',
@@ -190,6 +189,8 @@ def display_prompt():
         else:
             return None
     except:
+        # Catch possible CalledProcessError and OSError
+        print "An error occurred when displaying the user prompt."
         return None
 
 
@@ -313,7 +314,12 @@ def main():
             print "One or more blocking apps are running."
             sys.exit(1)
 
+        # Prompt the user to select a deferment
         secs = display_prompt()
+        if secs is None:
+            # Encountered an error, bail
+            display_error()
+            sys.exit(1)
 
         # Define the LaunchDaemon
         daemon = {'Label': args.launchdaemon_label,
@@ -327,21 +333,17 @@ def main():
                  }
 
         # Handle start interval of LaunchDaemon based on user's deferrment
-        if secs is not None:
-            if secs == 0:
-                # User chose to "start now" so add the RunAtLoad key
-                daemon['RunAtLoad'] = True
-            else:
-                # User chose to defer, so calculate the deltas and set the
-                # StartCalendarInterval key
-                day, hour, minute, datestring = calculate_deferment(secs)
-                daemon['StartCalendarInterval'] = {'Day': day,
-                                                'Hour': hour,
-                                                'Minute': minute
-                                                }
+        if secs == 0:
+            # User chose to "start now" so add the RunAtLoad key
+            daemon['RunAtLoad'] = True
         else:
-            display_error()
-            sys.exit(1)
+            # User chose to defer, so calculate the deltas and set the
+            # StartCalendarInterval key
+            day, hour, minute, datestring = calculate_deferment(secs)
+            daemon['StartCalendarInterval'] = {'Day': day,
+                                            'Hour': hour,
+                                            'Minute': minute
+                                            }
 
         # Try to write the LaunchDaemon
         if write_launchdaemon(daemon, ld_path):
