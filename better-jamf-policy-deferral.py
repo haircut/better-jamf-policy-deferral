@@ -26,6 +26,7 @@ import argparse
 import datetime
 import plistlib
 import subprocess
+from AppKit import NSWorkspace
 
 # Configuration
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -39,7 +40,7 @@ DEFAULT_LD_JAMF_TRIGGER = "trigger_for_deferred_policy"
 
 # If any app listed here is running on the client, no GUI prompts will be shown
 # and this program will exit silently with a non-zero exit code.
-# Examples include are to prevent interrupting presentations.
+# Examples included are to prevent interrupting presentations.
 BLOCKING_APPS = ['Keynote', 'Microsoft PowerPoint']
 
 # Paths to binaries
@@ -50,8 +51,8 @@ JAMFHELPER = ("/Library/Application Support/JAMF/bin/jamfHelper.app/Contents"
 # Prompt GUI Config
 GUI_WINDOW_TITLE = "IT Notification"
 GUI_HEADING = "Software Updates are ready to be installed."
-GUI_ICON = ("/System/Library/CoreServices/Software Update.app/Contents/"
-            "Resources/SoftwareUpdate.icns")
+GUI_ICON = ("/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources"
+            "/AlertCautionIcon.icns")
 GUI_MESSAGE = """Software updates are available for your Mac.
 
 NOTE: Some required updates will require rebooting your computer once installed.
@@ -66,8 +67,8 @@ GUI_BUTTON = "Okay"
 
 # Confirmation dialog Config
 GUI_S_HEADING = "Update scheduled"
-GUI_S_ICON = ("/System/Library/CoreServices/Software Update.app/Contents/"
-              "Resources/SoftwareUpdate.icns")
+GUI_S_ICON = ("/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources"
+              "/AlertCautionIcon.icns")
 GUI_S_BUTTON = "OK"
 # This string should contain '{date}' somewhere so that it may be replaced by
 # the specific datetime for which installation is scheduled
@@ -119,8 +120,6 @@ def build_argparser():
                         default=DEFAULT_LD_LABEL, nargs="?")
     parser.add_argument("jamf_trigger",
                         default=DEFAULT_LD_JAMF_TRIGGER, nargs="?")
-    parser.add_argument("unused", nargs="*")
-
     return parser.parse_known_args()[0]
 
 
@@ -140,7 +139,6 @@ def calculate_deferment(add_seconds):
     now = datetime.datetime.now()
     diff = datetime.timedelta(seconds=add_seconds)
     future = now + diff
-
     return (int(future.strftime("%d")),
             int(future.strftime("%-H")),
             int(future.strftime("%-M")),
@@ -154,24 +152,46 @@ def display_prompt():
         None
 
     Returns:
-        (int) defer_seconds: Number of second user wishes to defer installation
+        (int) defer_seconds: Number of seconds user wishes to defer policy
+        OR
+        None if an error occurs
     """
-    defer = subprocess.check_output([JAMFHELPER,
-                                     '-windowType', 'utility',
-                                     '-title', GUI_WINDOW_TITLE,
-                                     '-heading', GUI_HEADING,
-                                     '-icon', GUI_ICON,
-                                     '-description', GUI_MESSAGE,
-                                     '-button1', GUI_BUTTON,
-                                     '-showDelayOptions',
-                                     ' '.join(GUI_DEFER_OPTIONS),
-                                     '-lockHUD'])
-    # Slice return value of jamfhelper output to remove the button index
-    defer = defer[:-1]
-    if defer:
-        return defer
-    else:
-        return int(0)
+    cmd = [JAMFHELPER,
+           '-windowType', 'utility',
+           '-title', GUI_WINDOW_TITLE,
+           '-heading', GUI_HEADING,
+           '-icon', GUI_ICON,
+           '-description', GUI_MESSAGE,
+           '-button1', GUI_BUTTON,
+           '-showDelayOptions',
+           ' '.join(GUI_DEFER_OPTIONS),
+           '-lockHUD']
+    error_values = ['2', '3', '239', '243', '250', '255']
+    # Instead of returning an error code to stderr, jamfHelper always returns 0
+    # and possibly returns an 'error value' to stdout. This makes it somewhat
+    # spotty to check for some deferrment values including 0 for 'Start Now'.
+    # The return value is an integer, so leading zeroes are dropped. Selecting
+    # 'Start Now' should technically return '01'; instead, only '1' is returned
+    # which matches the 'error value' for 'The Jamf Helper was unable to launch'
+    # All we can do is make sure the subprocess doesn't raise an error, then
+    # assume (yikes!) a return value of '1' equates to 'Start Now'
+    try:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        out, err = proc.communicate()
+        # Check that the return value does not represent an 'error value'
+        if not out in error_values:
+            # Special case for 'Start Now' which returns '1'
+            if out == '1':
+                return 0
+            else:
+                return int(out[:-1])
+        else:
+            return None
+    except:
+        # Catch possible CalledProcessError and OSError
+        print "An error occurred when displaying the user prompt."
+        return None
 
 
 def display_confirm(start_date):
@@ -196,8 +216,7 @@ def display_confirm(start_date):
 
 
 def display_error():
-    """Displays an error if the LaunchDaemon cannot be written"""
-
+    """Displays a generic error if a problem occurs"""
     errmsg = subprocess.check_output([JAMFHELPER,
                                       '-windowType', 'utility',
                                       '-title', GUI_WINDOW_TITLE,
@@ -209,16 +228,14 @@ def display_error():
                                       '-lockHUD'])
 
 
-def check_pid(process_name):
-    """Checks for a pid of a running process"""
-    pid = subprocess.Popen(['pgrep', process_name],
-                           stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE)
-    pid.communicate()
-    if pid.returncode > 0:
-        return False
-    else:
-        return True
+def get_running_apps():
+    """Return a list of running applications"""
+    procs = []
+    workspace = NSWorkspace.sharedWorkspace()
+    running_apps = workspace.runningApplications()
+    for app in running_apps:
+        procs.append(app.localizedName())
+    return procs
 
 
 def detect_blocking_apps():
@@ -231,11 +248,11 @@ def detect_blocking_apps():
         (bool) true/false if any blocking app is running
     """
     blocking_app_running = False
+    running_apps = get_running_apps()
     for app in BLOCKING_APPS:
-        if check_pid(app):
+        if app in running_apps:
             print "Blocking app {} is running.".format(app)
             blocking_app_running = True
-
     return blocking_app_running
 
 
@@ -294,10 +311,15 @@ def main():
 
         # Check for blocking apps
         if detect_blocking_apps():
-            print "A blocking app was running"
+            print "One or more blocking apps are running."
             sys.exit(1)
 
+        # Prompt the user to select a deferment
         secs = display_prompt()
+        if secs is None:
+            # Encountered an error, bail
+            display_error()
+            sys.exit(1)
 
         # Define the LaunchDaemon
         daemon = {'Label': args.launchdaemon_label,
@@ -319,9 +341,9 @@ def main():
             # StartCalendarInterval key
             day, hour, minute, datestring = calculate_deferment(secs)
             daemon['StartCalendarInterval'] = {'Day': day,
-                                               'Hour': hour,
-                                               'Minute': minute
-                                              }
+                                            'Hour': hour,
+                                            'Minute': minute
+                                            }
 
         # Try to write the LaunchDaemon
         if write_launchdaemon(daemon, ld_path):
