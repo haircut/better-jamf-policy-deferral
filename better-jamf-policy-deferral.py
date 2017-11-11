@@ -26,6 +26,8 @@ import argparse
 import datetime
 import plistlib
 import subprocess
+from Cocoa import NSRunningApplication
+from AppKit import NSWorkspace
 
 # Configuration
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -154,24 +156,42 @@ def display_prompt():
         None
 
     Returns:
-        (int) defer_seconds: Number of second user wishes to defer installation
+        (int) defer_seconds: Number of seconds user wishes to defer policy
     """
-    defer = subprocess.check_output([JAMFHELPER,
-                                     '-windowType', 'utility',
-                                     '-title', GUI_WINDOW_TITLE,
-                                     '-heading', GUI_HEADING,
-                                     '-icon', GUI_ICON,
-                                     '-description', GUI_MESSAGE,
-                                     '-button1', GUI_BUTTON,
-                                     '-showDelayOptions',
-                                     ' '.join(GUI_DEFER_OPTIONS),
-                                     '-lockHUD'])
-    # Slice return value of jamfhelper output to remove the button index
-    defer = defer[:-1]
-    if defer:
-        return defer
-    else:
-        return int(0)
+    cmd = [JAMFHELPER,
+           '-windowType', 'utility',
+           '-title', GUI_WINDOW_TITLE,
+           '-heading', GUI_HEADING,
+           '-icon', GUI_ICON,
+           '-description', GUI_MESSAGE,
+           '-button1', GUI_BUTTON,
+           '-showDelayOptions',
+           ' '.join(GUI_DEFER_OPTIONS),
+           '-lockHUD']
+    error_values = ['2', '3', '239', '243', '250', '255']
+    # Instead of returning an error code to stderr, jamfHelper always returns 0
+    # and possibly returns an 'error value' to stdout. This makes it somewhat
+    # spotty to check for some deferrment values including 0 for 'Start Now'.
+    # The return value is an integer, so leading zeroes are dropped. Selecting
+    # 'Start Now' should technically return '01'; instead, only '1' is returned
+    # which matches the 'error value' for 'The Jamf Helper was unable to launch'
+    # All we can do is make sure the subprocess doesn't raise an error, then
+    # assume (yikes!) a return value of '1' equates to 'Start Now'
+    try:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        out, err = proc.communicate()
+        # Check that the return value does not represent an 'error value'
+        if not out in error_values:
+            # Special case for 'Start Now' which returns '1'
+            if out == '1':
+                return 0
+            else:
+                return int(out[:-1])
+        else:
+            return None
+    except:
+        return None
 
 
 def display_confirm(start_date):
