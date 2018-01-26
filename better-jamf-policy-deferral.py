@@ -26,6 +26,7 @@ import argparse
 import datetime
 import plistlib
 import subprocess
+import CoreFoundation
 from AppKit import NSWorkspace
 
 # Configuration
@@ -120,6 +121,8 @@ def build_argparser():
                         default=DEFAULT_LD_LABEL, nargs="?")
     parser.add_argument("jamf_trigger",
                         default=DEFAULT_LD_JAMF_TRIGGER, nargs="?")
+    parser.add_argument("os_update", nargs="?", action=choices_with_default(['yes', 'no'],
+                                                    'no'), type=str.lower)
     return parser.parse_known_args()[0]
 
 
@@ -256,6 +259,25 @@ def detect_blocking_apps():
     return blocking_app_running
 
 
+def check_for_softwareupdates():
+    """Confirms software updates are still needed before prompting.
+
+    Args:
+        none
+
+    Returns:
+        (bool) True/False if software updates are needed
+    """
+    su_not_needed = False
+    domain = 'com.apple.SoftwareUpdate'
+    key = 'LastUpdatesAvailable'
+    num_available_updates = CoreFoundation.CFPreferencesCopyAppValue(key, domain)
+    print "{} update(s) needed.".format(num_available_updates)
+    if num_available_updates == 0:
+        print "Updates no longer needed."
+        su_not_needed = True
+    return su_not_needed
+
 def write_launchdaemon(job_definition, path):
     """Writes the passed job definition to a LaunchDaemon"""
 
@@ -313,6 +335,15 @@ def main():
         if detect_blocking_apps():
             print "One or more blocking apps are running."
             sys.exit(1)
+
+        # Check if software updates are still needed
+        if args.os_update == 'yes':
+            print "OS Updates is set to %s" % args.os_update
+            if check_for_softwareupdates():
+                print "No Software Updates currently needed, exiting."
+                sys.exit(0)
+        else:
+            print "OS Updates is set to %s" % args.os_update
 
         # Prompt the user to select a deferment
         secs = display_prompt()

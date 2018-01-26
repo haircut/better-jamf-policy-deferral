@@ -5,7 +5,7 @@ execution of a policy until a more convenient time. Typically, this policy might
 involve a reboot or some system change that would interrupt a user and present an
 annoyance during their work day.
 
-The JSS provides built-in policy deferall options under the "User Interaction"
+The JSS provides built-in policy deferral options under the "User Interaction"
 tab in a policy's configuration (see the docs on "[User Interaction in JSS v9.9x](http://docs.jamf.com/9.9/casper-suite/administrator-guide/User_Interaction.html)).
 
 In use, it looks like this:
@@ -73,8 +73,9 @@ all available Software Updates.
    Management > Scripts. The script should have a Priority of "Before." Set the
    Parameter Label for Parameter 4 to "Mode (prompt or cleanup).
    Configure the Parameter Label for Parameter 5 as "LaunchDaemon Label." Set 
-   the Parameter Label for Parameter 6 to "Jamf Trigger." These optional 
-   parameters will allow you to override the defaults you set in the script at
+   the Parameter Label for Parameter 6 to "Jamf Trigger." Set the Parameter Label
+   7 to "OS Updates (yes or no)". These optional parameters will allow you to override
+   the defaults you set in the script at
    runtime.
 
 ### Creating Policies
@@ -113,7 +114,9 @@ creating a LaunchDaemon to execute your desired actions at a later time. An
 3. Add a "Scripts" payload and select the `better-jamf-policy-deferral.py` script.
    Set the script to run "Before" other policy items, and configure the parameters
    to your needs. The default "Mode" is "prompt" but you can set it here for
-   completeness.
+   completeness. Set Parameter 7 - the "OS Update" parameter - to "yes" if you want
+   the script to confirm OS updates are still needed before prompting the user,
+   default is "no". 
 4. Set an appropriate scope. You should be using Smart Groups to determine the 
    scope of computers that must run your "execution policy" and that same Smart
    Group would be an appropriate scope here. For our example "Software Updates"
