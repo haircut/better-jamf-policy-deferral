@@ -300,8 +300,16 @@ def main():
     args = build_argparser()
 
     # Assemble path to LaunchDaemon
+    # Jamf passes ALL script parameters where they are blank or not, so we need
+    # to test that the label argument is not blank
+    if args.launchdaemon_label == "":
+        # Use the default value from the head of the script
+        ld_label = DEFAULT_LD_LABEL
+    else:
+        # Use whatever was passed
+        ld_label = args.launchdaemon_label
     ld_path = os.path.join('/Library/LaunchDaemons',
-                           '{}.plist'.format(args.launchdaemon_label))
+                           '{}.plist'.format(ld_label))
 
     if args.mode == 'prompt':
         # Make sure the policy hasn't already been deferred
@@ -321,6 +329,15 @@ def main():
             display_error()
             sys.exit(1)
 
+        # Again, Jamf may pass a literal "" (blank) value so check for that in
+        # the policy trigger
+        if args.jamf_trigger == "":
+            # Use the script-specified default
+            policy_trigger = DEFAULT_LD_JAMF_TRIGGER
+        else:
+            # Use what was passed
+            policy_trigger = args.jamf_trigger
+
         # Define the LaunchDaemon
         daemon = {'Label': args.launchdaemon_label,
                   'UserName': 'root',
@@ -329,7 +346,7 @@ def main():
                   'ProgramArguments': ['/usr/local/bin/jamf',
                                        'policy',
                                        '-event',
-                                       args.jamf_trigger]
+                                       policy_trigger]
                  }
 
         # Handle start interval of LaunchDaemon based on user's deferrment
