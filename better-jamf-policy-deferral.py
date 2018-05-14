@@ -316,7 +316,7 @@ def main():
         # Ensure a user is logged in
         consoleuser = SCDynamicStoreCopyConsoleUser(None, None, None)[0]
         if not consoleuser:
-            print "No use is logged in, so the prompt cannot appear. Exiting."
+            print "No user is logged in, so the prompt cannot appear. Exiting."
             sys.exit(1)
 
         # Make sure the policy hasn't already been deferred
