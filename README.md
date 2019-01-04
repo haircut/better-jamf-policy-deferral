@@ -28,6 +28,25 @@ Enter Better Jamf Policy Deferral.
 
 ![Better Jamf Policy Deferral](https://haircut.keybase.pub/github/better-jamf-policy-deferral/better-policy-deferment.gif)
 
+## Important: Behavior when the system is "off" at the scheduled deferral time
+
+As an important consideration, be aware that if the system is off (i.e. the Mac
+is shut down) at the time a deferred action is scheduled to run, the action 
+**will not run** when the system is turned back on.
+
+This is a limitation of `launchd` jobs.
+
+> If you schedule a `launchd` job by setting the `StartCalendarInterval` key and 
+> the computer is asleep when the job should have run, your job will run when 
+> the computer wakes up. However, if the machine is off when the job should 
+> have run, the job does not execute until the next designated time occurs.
+> 
+> -- <cite>https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/ScheduledJobs.html</cite>
+
+I am aware of the potential issue this creates but have not yet developed
+a suitable workaround. I am open to any suggestions, though! Open an issue
+or better yet, a pull request if you have ideas.
+
 ## A Word on the Philosophy Behind Deferrals
 
 Why do you want to allow a policy's action(s) to be postponed?
