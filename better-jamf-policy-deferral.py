@@ -1,6 +1,6 @@
-#!/usr/bin/python
+#!/usr/local/bin/managed_python3
 # -*- coding: utf-8 -*-
-# Copyright (C) 2017 Matthew Warren
+# Copyright (C) 2017–2022 Matthew Warren
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -53,7 +53,7 @@ JAMFHELPER = ("/Library/Application Support/JAMF/bin/jamfHelper.app/Contents"
 GUI_WINDOW_TITLE = "IT Notification"
 GUI_HEADING = "Software Updates are ready to be installed."
 GUI_ICON = ("/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources"
-            "/AlertCautionIcon.icns")
+            "/AlertStopIcon.icns")
 GUI_MESSAGE = """Software updates are available for your Mac.
 
 NOTE: Some required updates will require rebooting your computer once installed.
@@ -69,7 +69,7 @@ GUI_BUTTON = "Okay"
 # Confirmation dialog Config
 GUI_S_HEADING = "Update scheduled"
 GUI_S_ICON = ("/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources"
-              "/AlertCautionIcon.icns")
+              "/AlertStopIcon.icns")
 GUI_S_BUTTON = "OK"
 # This string should contain '{date}' somewhere so that it may be replaced by
 # the specific datetime for which installation is scheduled
@@ -191,7 +191,7 @@ def display_prompt():
             return None
     except:
         # Catch possible CalledProcessError and OSError
-        print "An error occurred when displaying the user prompt."
+        print("An error occurred when displaying the user prompt.")
         return None
 
 
@@ -252,7 +252,7 @@ def detect_blocking_apps():
     running_apps = get_running_apps()
     for app in BLOCKING_APPS:
         if app in running_apps:
-            print "Blocking app {} is running.".format(app)
+            print("Blocking app {} is running.".format(app))
             blocking_app_running = True
     return blocking_app_running
 
@@ -263,23 +263,23 @@ def write_launchdaemon(job_definition, path):
     success = True
 
     try:
-        with open(path, 'w+') as output_file:
-            plistlib.writePlist(job_definition, output_file)
+        with open(path, 'wb+') as output_file:
+            plistlib.dump(job_definition, output_file)
     except IOError:
-        print "Unable to write LaunchDaemon!"
+        print("Unable to write LaunchDaemon!")
         success = False
 
     # Permissions and ownership
     try:
-        os.chmod(path, 0644)
+        os.chmod(path, 0o644)
     except:
-        print "Unable to set permissions on LaunchDaemon!"
+        print("Unable to set permissions on LaunchDaemon!")
         success = False
 
     try:
         os.chown(path, 0, 0)
     except:
-        print "Unable to set ownership on LaunchDaemon!"
+        print("Unable to set ownership on LaunchDaemon!")
         success = False
 
     # Load job
@@ -289,7 +289,7 @@ def write_launchdaemon(job_definition, path):
     load_job.communicate()
 
     if load_job.returncode > 0:
-        print "Unable to load LaunchDaemon!"
+        print("Unable to load LaunchDaemon!")
         success = False
 
     return success
@@ -316,17 +316,17 @@ def main():
         # Ensure a user is logged in
         consoleuser = SCDynamicStoreCopyConsoleUser(None, None, None)[0]
         if not consoleuser:
-            print "No user is logged in, so the prompt cannot appear. Exiting."
+            print("No user is logged in, so the prompt cannot appear. Exiting.")
             sys.exit(1)
 
         # Make sure the policy hasn't already been deferred
         if os.path.exists(ld_path):
-            print "It appears the user has already chosen to defer this policy."
+            print("It appears the user has already chosen to defer this policy.")
             sys.exit(1)
 
         # Check for blocking apps
         if detect_blocking_apps():
-            print "One or more blocking apps are running."
+            print("One or more blocking apps are running.")
             sys.exit(1)
 
         # Prompt the user to select a deferment
@@ -392,14 +392,14 @@ def main():
             # so it doesn't load back up on next system boot.
             try:
                 os.remove(ld_path)
-                print "File at {} removed".format(ld_path)
+                print("File at {} removed".format(ld_path))
             except OSError:
-                print "Unable to remove {}; does it exist?".format(ld_path)
+                print("Unable to remove {}; does it exist?".format(ld_path))
 
             sys.exit(0)
 
         else:
-            print "No LaunchDaemon found at {}".format(ld_path)
+            print("No LaunchDaemon found at {}".format(ld_path))
             # Nothing to do, so exit
             sys.exit(0)
 
