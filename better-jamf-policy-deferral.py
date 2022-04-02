@@ -180,6 +180,7 @@ def display_prompt():
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE)
         out, err = proc.communicate()
+        out = out.decode("UTF-8")
         # Check that the return value does not represent an 'error value'
         if not out in error_values:
             # Special case for 'Start Now' which returns '1'
